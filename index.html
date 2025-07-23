@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tap Craft</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * { box-sizing: border-box; font-family: sans-serif; }
+    body, html { margin: 0; padding: 0; background: #d0f0ff; }
+    #game {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      touch-action: none;
+    }
+    .tile {
+      position: absolute;
+      font-size: 32px;
+      user-select: none;
+    }
+    #ui {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      background: rgba(255,255,255,0.8);
+      padding: 5px;
+    }
+    #inventory {
+      display: flex;
+      gap: 10px;
+    }
+    .item {
+      padding: 4px 8px;
+      background: #eee;
+      border: 1px solid #aaa;
+    }
+    #craftBtn {
+      background: #88c;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+    }
+    #craftMenu {
+      display: none;
+      position: absolute;
+      top: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      border: 1px solid #000;
+      padding: 10px;
+      z-index: 1000;
+    }
+    .enemy-bar {
+      height: 4px;
+      background: red;
+      width: 100%;
+    }
+    #healthBar {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      width: 200px;
+      height: 10px;
+      background: #aaa;
+    }
+    #healthBarInner {
+      height: 100%;
+      width: 100%;
+      background: #0f0;
+    }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <div id="ui">
+      <div id="inventory"></div>
+      <button id="craftBtn">Craft</button>
+    </div>
+    <div id="craftMenu">
+      <button onclick="craft('door')">Door (3 wood)</button><br>
+      <button onclick="craft('torch')">Torch (2 wood)</button><br>
+      <button onclick="craft('axe')">Axe (5 wood)</button>
+    </div>
+    <div id="healthBar"><div id="healthBarInner"></div></div>
+  </div>
+  <script>
+    const game = document.getElementById("game");
+    const inventoryEl = document.getElementById("inventory");
+    const craftBtn = document.getElementById("craftBtn");
+    const craftMenu = document.getElementById("craftMenu");
+    const healthBarInner = document.getElementById("healthBarInner");
+
+    let inventory = { wood: 10, door: 0, torch: 0, axe: 0 };
+    let selectedItem = "wood";
+    let player = { x: 5, y: 5, hp: 20 };
+    let tiles = {};
+    let enemies = [];
+
+    function updateInventory() {
+      inventoryEl.innerHTML = "";
+      for (let key in inventory) {
+        const item = document.createElement("div");
+        item.className = "item";
+        item.innerText = key + ": " + inventory[key];
+        item.onclick = () => selectedItem = key;
+        inventoryEl.appendChild(item);
+      }
+    }
+
+    function placeTile(x, y, type) {
+      if (!tiles[`${x},${y}`]) {
+        const el = document.createElement("div");
+        el.className = "tile";
+        el.innerText = type === "tree" ? "🌳" : type === "torch" ? "🔥" : type === "door" ? "🚪" : "🟫";
+        el.style.left = x * 32 + "px";
+        el.style.top = y * 32 + "px";
+        el.dataset.x = x;
+        el.dataset.y = y;
+        el.dataset.type = type;
+        el.onclick = () => interact(el);
+        game.appendChild(el);
+        tiles[`${x},${y}`] = el;
+      }
+    }
+
+    function interact(el) {
+      let type = el.dataset.type;
+      if (type === "tree") {
+        let hits = el.dataset.hits ? parseInt(el.dataset.hits) : 3;
+        hits--;
+        el.dataset.hits = hits;
+        el.innerText = "🌳 (" + hits + ")";
+        if (hits <= 0) {
+          game.removeChild(el);
+          delete tiles[`${el.dataset.x},${el.dataset.y}`];
+          inventory.wood += 1;
+          updateInventory();
+        }
+      } else if (type === "door") {
+        el.innerText = el.innerText === "🚪" ? "🟫" : "🚪";
+      } else if (type === "torch") {
+        // No interaction for torches yet
+      }
+    }
+
+    function spawnEnemies() {
+      if (Math.random() < 0.05) {
+        let ex = Math.floor(Math.random() * 20);
+        let ey = Math.floor(Math.random() * 15);
+        let tooCloseToTorch = false;
+        for (let dx = -8; dx <= 8; dx++) {
+          for (let dy = -8; dy <= 8; dy++) {
+            let key = `${ex + dx},${ey + dy}`;
+            if (tiles[key] && tiles[key].dataset.type === "torch") {
+              tooCloseToTorch = true;
+              break;
+            }
+          }
+        }
+        if (!tooCloseToTorch) {
+          const el = document.createElement("div");
+          el.className = "tile";
+          el.innerText = "👹";
+          el.style.left = ex * 32 + "px";
+          el.style.top = ey * 32 + "px";
+          el.dataset.hp = 10;
+          const bar = document.createElement("div");
+          bar.className = "enemy-bar";
+          el.appendChild(bar);
+          el.dataset.x = ex;
+          el.dataset.y = ey;
+          game.appendChild(el);
+          enemies.push({ el, x: ex, y: ey, lastAttack: 0 });
+        }
+      }
+    }
+
+    function updateEnemies() {
+      enemies.forEach((enemy, i) => {
+        let dx = player.x - enemy.x;
+        let dy = player.y - enemy.y;
+        let dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist <= 10) {
+          if (Math.abs(dx) > Math.abs(dy)) enemy.x += Math.sign(dx);
+          else enemy.y += Math.sign(dy);
+          enemy.el.style.left = enemy.x * 32 + "px";
+          enemy.el.style.top = enemy.y * 32 + "px";
+          let distanceToPlayer = Math.sqrt((player.x - enemy.x)**2 + (player.y - enemy.y)**2);
+          if (distanceToPlayer <= 2 && Date.now() - enemy.lastAttack > 3000) {
+            player.hp -= 1;
+            enemy.lastAttack = Date.now();
+            updateHealthBar();
+          }
+        }
+      });
+    }
+
+    function updateHealthBar() {
+      healthBarInner.style.width = (player.hp / 20 * 100) + "%";
+    }
+
+    function craft(item) {
+      if (item === "door" && inventory.wood >= 3) {
+        inventory.wood -= 3;
+        inventory.door += 1;
+      } else if (item === "torch" && inventory.wood >= 2) {
+        inventory.wood -= 2;
+        inventory.torch += 1;
+      } else if (item === "axe" && inventory.wood >= 5) {
+        inventory.wood -= 5;
+        inventory.axe += 1;
+      }
+      updateInventory();
+    }
+
+    craftBtn.onclick = () => {
+      craftMenu.style.display = craftMenu.style.display === "none" ? "block" : "none";
+    };
+
+    game.addEventListener("click", (e) => {
+      let x = Math.floor(e.clientX / 32);
+      let y = Math.floor(e.clientY / 32);
+      if (selectedItem === "wood" && inventory.wood > 0 && !tiles[`${x},${y}`]) {
+        placeTile(x, y, "wood");
+        inventory.wood--;
+        updateInventory();
+      } else if (selectedItem === "door" && inventory.door > 0) {
+        placeTile(x, y, "door");
+        inventory.door--;
+        updateInventory();
+      } else if (selectedItem === "torch" && inventory.torch > 0) {
+        placeTile(x, y, "torch");
+        inventory.torch--;
+        updateInventory();
+      }
+    });
+
+    // Initial setup
+    updateInventory();
+    for (let i = 0; i < 10; i++) {
+      placeTile(Math.floor(Math.random() * 15), Math.floor(Math.random() * 10), "tree");
+    }
+
+    // Game loop
+    setInterval(() => {
+      spawnEnemies();
+      updateEnemies();
+    }, 1000);
+  </script>
+</body>
+</html>
