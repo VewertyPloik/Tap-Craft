@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tap Craft</title>
+<style>
+  body {
+    font-family: sans-serif;
+    margin: 0; padding: 0;
+    background: #cce7ff;
+    user-select:none;
+    overflow-x: hidden;
+  }
+  #homeScreen, #howToPlayScreen, #pauseMenu, #craftPopup, #placeSelector, #chestPopup, #overlay {
+    position: fixed; top:0; left:0; width:100%; height:100%;
+    background: rgba(0,0,0,0.75);
+    display:none;
+    color:#fff;
+    z-index:1000;
+  }
+  #homeScreen, #howToPlayScreen, #pauseMenu {
+    background: #2a3c4a;
+    color:#eee;
+    display:flex;
+    flex-direction: column;
+    justify-content:center;
+    align-items:center;
+  }
+  button {
+    margin: 8px;
+    padding: 12px 20px;
+    font-size: 1.1rem;
+    border:none;
+    border-radius: 5px;
+    cursor:pointer;
+  }
+  #game, #ui {
+    display: none;
+  }
+  #game {
+    margin: 8px auto;
+    width: 420px;
+    max-width: 100vw;
+    display: grid;
+    grid-template-columns: repeat(15, 28px);
+    grid-template-rows: repeat(15, 28px);
+    gap: 2px;
+    background: #356e28;
+    border: 3px solid #2a3c4a;
+    position: relative;
+    touch-action: none;
+  }
+  .tile {
+    width: 28px;
+    height: 28px;
+    background: #67a44c;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 18px;
+    user-select:none;
+    cursor: pointer;
+    position: relative;
+  }
+  .tile.grass { background: #67a44c; }
+  .tile.tree { background: #2d5d1c; }
+  .tile.door { background: #b06a0b; }
+  .tile.chest { background: #a0522d; }
+  .tile.bed { background: #83393e; }
+  .tile.torch { background: #a05f16; }
+  .tile.wood { background: #6b4a11; }
+  .player {
+    font-size: 22px;
+  }
+  .monster {
+    font-size: 22px;
+  }
+  #ui {
+    width: 420px;
+    max-width: 100vw;
+    margin: 0 auto 16px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    background: #2a3c4a;
+    color: white;
+    padding: 8px;
+    border-radius: 6px;
+  }
+  #inventory {
+    display: flex;
+    gap: 8px;
+  }
+  .inv-slot {
+    width: 30px; height: 30px;
+    background: #45624f;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    border-radius:4px;
+    font-size: 18px;
+    user-select:none;
+  }
+  #messages {
+    width: 100%;
+    min-height: 20px;
+    margin-top: 4px;
+    font-weight: bold;
+    color: #fff;
+    text-align: center;
+    font-size: 14px;
+  }
+  #controls {
+    margin: 12px auto 0;
+    display: none;
+    width: 420px;
+    max-width: 100vw;
+    justify-content: center;
+    gap: 12px;
+  }
+  #controls button {
+    font-size: 1.5rem;
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+    background: #2a3c4a;
+    color: #fff;
+  }
+  #craftBtn, #placeBtn, #pauseBtn {
+    margin: 4px 6px;
+    padding: 8px 16px;
+    font-size: 1rem;
+    border-radius: 8px;
+    background: #4a6a9d;
+    color: white;
+  }
+  /* Popups styling */
+  #craftPopup, #placeSelector, #chestPopup {
+    background: #2a3c4a;
+    border-radius: 8px;
+    width: 320px;
+    max-width: 90vw;
+    padding: 16px;
+    color: white;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    position: fixed;
+    z-index: 1010;
+  }
+  #craftPopup button, #placeSelector button {
+    width: 100%;
+    margin-bottom: 8px;
+    font-size: 1.1rem;
+  }
+  #placeSelector button {
+    cursor:pointer;
+  }
+  #chestPopup {
+    width: 280px;
+  }
+  #chestGrid {
+    display: flex;
+    justify-content: space-between;
+    margin: 12px 0;
+  }
+  #chestGrid .inv-slot {
+    width: 60px;
+    height: 60px;
+    font-size: 24px;
+    background: #45624f;
+    cursor: pointer;
+  }
+  #healthBar {
+    width: 100%;
+    height: 20px;
+    background: #555;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+  #healthFill {
+    height: 100%;
+    background: #e44c4c;
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+
+<!-- Home Screen -->
+<div id="homeScreen">
+  <h1>Tap Craft</h1>
+  <button id="startGameBtn">Start Game</button>
+  <button id="howToPlayBtn">How to Play</button>
+</div>
+
+<!-- How to Play Screen -->
+<div id="howToPlayScreen">
+  <h2>How to Play</h2>
+  <p>Welcome to Tap Craft!</p>
+  <ul>
+    <li>Move with arrow keys or on-screen buttons.</li>
+    <li>Tap trees 🌳 3 times to get wood.</li>
+    <li>Use wood to craft doors, torches, axes, chests, and beds.</li>
+    <li>Place items with the "Select Item to Place" button.</li>
+    <li>Torches light up area and keep monsters 👹 away.</li>
+    <li>Monsters spawn at night (5 minutes) and attack you if close.</li>
+    <li>Use your fist or axe to fight monsters (axe does more damage).</li>
+    <li>Sleep in beds to skip the night.</li>
+    <li>If you die, you lose your inventory and respawn at a bed or random spot.</li>
+  </ul>
+  <button id="backToHomeBtn">Back to Home</button>
+</div>
+
+<!-- Game UI -->
+<div id="ui">
+  <div id="healthBar"><div id="healthFill"></div></div>
+  <div id="inventory"></div>
+  <button id="craftBtn">Open Crafting</button>
+  <button id="placeBtn">Select Item to Place</button>
+  <button id="pauseBtn">Pause</button>
+  <div id="messages"></div>
+</div>
+
+<!-- Game Grid -->
+<div id="game"></div>
+
+<!-- Mobile Controls -->
+<div id="controls">
+  <button id="upBtn">▲</button>
+  <button id="leftBtn">◀</button>
+  <button id="downBtn">▼</button>
+  <button id="rightBtn">▶</button>
+</div>
+
+<!-- Crafting Popup -->
+<div id="craftPopup">
+  <h3>Craft Items</h3>
+  <button data-item="door">Door (2 wood)</button>
+  <button data-item="torch">Torch (1 wood)</button>
+  <button data-item="axe">Axe (4 wood)</button>
+  <button data-item="chest">Chest (3 wood)</button>
+  <button data-item="bed">Bed (3 wood + 2 felt)</button>
+  <button id="closeCraftBtn">Close</button>
+</div>
+
+<!-- Place Item Selector Popup -->
+<div id="placeSelector">
+  <h3>Select Item to Place</h3>
+  <button data-place="door">Door</button>
+  <button data-place="torch">Torch</button>
+  <button data-place="chest">Chest</button>
+  <button data-place="bed">Bed</button>
+  <button data-place="wood">Wood Block</button>
+  <button id="closePlaceSelectorBtn">Cancel</button>
+</div>
+
+<!-- Chest Popup -->
+<div id="chestPopup">
+  <h3>Chest Inventory (3 slots)</h3>
+  <div id="chestGrid"></div>
+  <button id="closeChestBtn">Close</button>
+</div>
+
+<!-- Pause Menu -->
+<div id="pauseMenu">
+  <h2>Game Paused</h2>
+  <button id="resumeBtn">Resume</button>
+  <button id="pauseHowToPlayBtn">How to Play</button>
+  <button id="pauseHomeBtn">Home Screen</button>
+</div>
+
+<!-- Overlay -->
+<div id="overlay"></div>
+
+<script>
+(() => {
+  // Constants
+  const WORLD_WIDTH = 15;
+  const WORLD_HEIGHT = 15;
+  const PLAYER_MAX_HEALTH = 20;
+  const DAY_DURATION = 5 * 60 * 1000; // 5 minutes
+  const NIGHT_DURATION = 5 * 60 * 1000; // 5 minutes
+  const MONSTER_MOVE_INTERVAL = 1000; // 1 second
+  const PLAYER_MOVE_INTERVAL = 150; // ms
+  const ATTACK_RANGE = 3;
+  const MONSTER_ATTACK_RANGE = 1;
+
+  // DOM Elements
+  const homeScreen = document.getElementById('homeScreen');
+  const startGameBtn = document.getElementById('startGameBtn');
+  const howToPlayBtn = document.getElementById('howToPlayBtn');
+  const howToPlayScreen = document.getElementById('howToPlayScreen');
+  const backToHomeBtn = document.getElementById('backToHomeBtn');
+  const gameEl = document.getElementById('game');
+  const uiEl = document.getElementById('ui');
+  const healthFill = document.getElementById('healthFill');
+  const inventoryEl = document.getElementById('inventory');
+  const messagesEl = document.getElementById('messages');
+  const craftBtn = document.getElementById('craftBtn');
+  const craftPopup = document.getElementById('craftPopup');
+  const closeCraftBtn = document.getElementById('closeCraftBtn');
+  const placeBtn = document.getElementById('placeBtn');
+  const placeSelector = document.getElementById('placeSelector');
+  const closePlaceSelectorBtn = document.getElementById('closePlaceSelectorBtn');
+  const chestPopup = document.getElementById('chestPopup');
+  const chestGrid = document.getElementById('chestGrid');
+  const closeChestBtn = document.getElementById('closeChestBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const pauseMenu = document.getElementById('pauseMenu');
+  const resumeBtn = document.getElementById('resumeBtn');
+  const pauseHowToPlayBtn = document.getElementById('pauseHowToPlayBtn');
+  const pauseHomeBtn = document.getElementById('pauseHomeBtn');
+  const overlay = document.getElementById('overlay');
+  const controls = document.getElementById('controls');
+  const upBtn = document.getElementById('upBtn');
+  const downBtn = document.getElementById('downBtn');
+  const leftBtn = document.getElementById('leftBtn');
+  const rightBtn = document.getElementById('rightBtn');
+
+  // World and game state
+  let world = [];
+  let player = {
+    x: 7, y: 5, health: PLAYER_MAX_HEALTH, maxHealth: PLAYER_MAX_HEALTH,
+    inventory: {wood:5, felt:0, door:0, torch:0, axe:0, chest:0, bed:0},
+    holdingPlaceItem: null,
+    holdingTool: 'fist', // fist or axe
+  };
+  let monsters = [];
+  let trees = [];
+  let doorsPlaced = [];
+  let chestsPlaced = [];
+  let bedsPlaced = [];
+  let torchesPlaced = [];
+
+  // Timers and state
+  let dayNightTimer = 0;
+  let isNight = false;
+  let lastUpdate = null;
+  let monsterMoveTimer = 0;
+  let playerMoveTimer = 0;
+  let paused = false;
+  let messageTimeout = null;
+
+  // Utils
+  function inBounds(x,y) {
+    return x >= 0 && x < WORLD_WIDTH && y >= 0 && y < WORLD_HEIGHT;
+  }
+  function distance(x1,y1,x2,y2) {
+    return Math.max(Math.abs(x1-x2), Math.abs(y1-y2));
+  }
+
+  // Initialize world with grass and trees
+  function initWorld() {
+    world = [];
+    trees = [];
+    doorsPlaced = [];
+    chestsPlaced = [];
+    bedsPlaced = [];
+    torchesPlaced = [];
+    for(let y=0; y<WORLD_HEIGHT; y++) {
+      const row = [];
+      for(let x=0; x<WORLD_WIDTH; x++) {
+        // Randomly place trees ~30%
+        if(Math.random() < 0.3) {
+          row.push({type:'tree', hits:0});
+          trees.push({x,y,hits:0});
+        } else {
+          row.push({type:'grass'});
+        }
+      }
+      world.push(row);
+    }
+  }
+
+  // Display message to player
+  function showMessage(text) {
+    clearTimeout(messageTimeout);
+    messagesEl.textContent = text;
+    messageTimeout = setTimeout(() => { messagesEl.textContent = ''; }, 3500);
+  }
+
+  // Update UI: health and inventory
+  function updateUI() {
+    healthFill.style.width = (player.health/player.maxHealth*100) + '%';
+    inventoryEl.innerHTML = '';
+    for(let item in player.inventory) {
+      if(player.inventory[item] > 0) {
+        const slot = document.createElement('div');
+        slot.className = 'inv-slot';
+        slot.textContent = item[0].toUpperCase() + player.inventory[item];
+        inventoryEl.appendChild(slot);
+      }
+    }
+  }
+
+  // Check if tile solid for player (doors NOT solid for player)
+  function isSolidForPlayer(x,y) {
+    if(!inBounds(x,y)) return true;
+    const tile = world[y][x];
+    if(tile.type === 'tree') return true;
+    if(tile.type === 'door') return false; // player can walk through doors
+    if(tile.type === 'torch') return true;
+    if(tile.type === 'chest') return true;
+    if(tile.type === 'bed') return true;
+    if(tile.type === 'wood') return true;
+    return false;
+  }
+
+  // Check if tile solid for monsters (doors solid for monsters)
+  function isSolidForMonster(x,y) {
+    if(!inBounds(x,y)) return true;
+    const tile = world[y][x];
+    if(tile.type === 'tree') return true;
+    if(tile.type === 'door') return true; // monsters can't walk through doors
+    if(tile.type === 'torch') return true;
+    if(tile.type === 'chest') return true;
+    if(tile.type === 'bed') return true;
+    if(tile.type === 'wood') return true;
+    return false;
+  }
+
+  // Check if tile lit by torch (5 tile radius)
+  function isLitByTorch(x,y) {
+    for(let torch of torchesPlaced) {
+      if(distance(x,y,torch.x, torch.y) <= 5) return true;
+    }
+    return false;
+  }
+
+  // Spawn monsters 3 per night avoiding torches
+  function spawnMonsters() {
+    monsters = [];
+    let spawned = 0;
+    while(spawned < 3) {
+      let x = Math.floor(Math.random()*WORLD_WIDTH);
+      let y = Math.floor(Math.random()*WORLD_HEIGHT);
+      if(world[y][x].type === 'grass' && !isLitByTorch(x,y)) {
+        monsters.push({x,y,health:10,attackTimer:0});
+        spawned++;
+      }
+    }
+  }
+
+  // Clear monsters at day start
+  function clearMonsters() {
+    monsters = [];
+  }
+
+  // Render the whole world and entities
+  function renderWorld() {
+    let html = '';
+    for(let y=0; y<WORLD_HEIGHT; y++) {
+      for(let x=0; x<WORLD_WIDTH; x++) {
+        const tile = world[y][x];
+        let tileClass = 'tile '+tile.type;
+        let style = '';
+        if(isNight) {
+          if(isLitByTorch(x,y)) {
+            style = 'filter: brightness(1.2);';
+          } else {
+            style = 'filter: brightness(0.3);';
+          }
+        }
+        html += `<div class="${tileClass}" data-x="${x}" data-y="${y}" style="${style}">`;
+        if(player.x === x && player.y === y) {
+          html += '<span class="player">😀</span>';
+        } else {
+          const mon = monsters.find(m => m.x === x && m.y === y && m.health > 0);
+          if(mon) html += '<span class="monster">👹</span>';
+
+          const door = doorsPlaced.find(d => d.x === x && d.y === y);
+          if(door) {
+            html += `<span class="door">${door.open ? '🚪' : '🚪'}</span>`;
+          }
+          const chest = chestsPlaced.find(c => c.x === x && c.y === y);
+          if(chest) {
+            html += '<span class="chest">📦</span>';
+          }
+          if(tile.type === 'torch') {
+            html += '🔥';
+          }
+          if(tile.type === 'wood') {
+            html += '🪵';
+          }
+          if(tile.type === 'tree') {
+            html += '🌳';
+          }
+          if(tile.type === 'bed') {
+            html += '🛏️';
+          }
+        }
+        html += '</div>';
+      }
+    }
+    gameEl.innerHTML = html;
+  }
+
+  // Move player with arrow keys or buttons
+  function movePlayer(dx,dy) {
+    if(paused) return;
+    playerMoveTimer += PLAYER_MOVE_INTERVAL;
+    const nx = player.x + dx;
+    const ny = player.y + dy;
+    if(!inBounds(nx,ny)) return;
+    // player can walk through monsters
+    if(isSolidForPlayer(nx,ny)) return;
+    player.x = nx;
+    player.y = ny;
+    renderWorld();
+    updateUI();
+  }
+
+  // Move monsters toward player slower (2x slower)
+  let monsterMoveAccum = 0;
+  function moveMonsters(delta) {
+    if(paused) return;
+    monsterMoveAccum += delta;
+    if(monsterMoveAccum < MONSTER_MOVE_INTERVAL*2) return;
+    monsterMoveAccum = 0;
+
+    monsters.forEach(mon => {
+      if(mon.health <= 0) return;
+      let dx = 0, dy = 0;
+      if(mon.x < player.x) dx = 1;
+      else if(mon.x > player.x) dx = -1;
+      if(mon.y < player.y) dy = 1;
+      else if(mon.y > player.y) dy = -1;
+
+      // try moving horizontally first
+      if(dx !== 0 && !isSolidForMonster(mon.x + dx, mon.y)) {
+        mon.x += dx;
+      } else if(dy !== 0 && !isSolidForMonster(mon.x, mon.y + dy)) {
+        mon.y += dy;
+      }
+    });
+  }
+
+  // Player attacks monster if within 3 tiles
+  function attackMonsterIfClose() {
+    for(let mon of monsters) {
+      if(mon.health <= 0) continue;
+      if(distance(player.x, player.y, mon.x, mon.y) <= ATTACK_RANGE) {
+        // Damage depends on tool
+        let dmg = player.holdingTool === 'axe' ? 5 : 2;
+        mon.health -= dmg;
+        showMessage(`Hit monster for ${dmg} damage! HP left: ${mon.health}`);
+        if(mon.health <= 0) {
+          showMessage("Monster defeated! +1 felt");
+          player.inventory.felt = (player.inventory.felt || 0) + 1;
+        }
+        updateUI();
+        break;
+      }
+    }
+  }
+
+  // Monster attacks player every 3 seconds if adjacent (1 tile or less)
+  function monsterAttack(delta) {
+    if(paused) return;
+    monsters.forEach(mon => {
+      if(mon.health <= 0) return;
+      mon.attackTimer += delta;
+      if(mon.attackTimer >= 3000) {
+        if(distance(mon.x, mon.y, player.x, player.y) <= MONSTER_ATTACK_RANGE) {
+          player.health -= 2;
+          showMessage("Monster hit you for 2 damage!");
+          updateUI();
+          if(player.health <= 0) {
+            onPlayerDeath();
+          }
+        }
+        mon.attackTimer = 0;
+      }
+    });
+  }
+
+  // Player chops trees (must be within 3 tiles)
+  function chopTreeAt(x,y) {
+    if(distance(player.x, player.y, x, y) > 3) {
+      showMessage("Too far from tree!");
+      return;
+    }
+    if(!inBounds(x,y)) return;
+    const tile = world[y][x];
+    if(tile.type !== 'tree') return;
+    tile.hits = (tile.hits || 0) + 1;
+    if(tile.hits >= 3) {
+      // Remove tree and drop 1 wood
+      world[y][x] = {type:'grass'};
+      showMessage("Tree chopped! +1 wood");
+      player.inventory.wood = (player.inventory.wood || 0) + 1;
+      // Respawn tree after 10 seconds
+      setTimeout(() => {
+        if(world[y][x].type === 'grass') {
+          world[y][x] = {type:'tree', hits:0};
+          renderWorld();
+        }
+      }, 10000);
+    } else {
+      showMessage(`Hit tree (${tile.hits}/3)`);
+    }
+    renderWorld();
+    updateUI();
+  }
+
+  // Place block at tile
+  function placeBlock(x,y) {
+    if(!inBounds(x,y)) return;
+    if(world[y][x].type !== 'grass') {
+      showMessage("Can only place on grass");
+      return;
+    }
+    if(!player.holdingPlaceItem) {
+      showMessage("No item selected to place");
+      return;
+    }
+    if((player.inventory[player.holdingPlaceItem] || 0) <= 0) {
+      showMessage(`No ${player.holdingPlaceItem} to place`);
+      return;
+    }
+    // Place blocks and update data
+    world[y][x] = {type: player.holdingPlaceItem};
+    if(player.holdingPlaceItem === 'door') {
+      doorsPlaced.push({x,y,open:false});
+    } else if(player.holdingPlaceItem === 'chest') {
+      chestsPlaced.push({x,y,contents: []});
+    } else if(player.holdingPlaceItem === 'bed') {
+      bedsPlaced.push({x,y});
+    } else if(player.holdingPlaceItem === 'torch') {
+      torchesPlaced.push({x,y});
+    }
+    player.inventory[player.holdingPlaceItem]--;
+    if(player.inventory[player.holdingPlaceItem] < 0) player.inventory[player.holdingPlaceItem] = 0;
+    showMessage(`${player.holdingPlaceItem.charAt(0).toUpperCase() + player.holdingPlaceItem.slice(1)} placed!`);
+    player.holdingPlaceItem = null;
+    placeSelector.style.display = 'none';
+    overlay.style.display = 'none';
+    renderWorld();
+    updateUI();
+  }
+
+  // Toggle door open/close
+  function toggleDoorAt(x,y) {
+    const door = doorsPlaced.find(d => d.x === x && d.y === y);
+    if(!door) return;
+    door.open = !door.open;
+    renderWorld();
+  }
+
+  // Open chest at x,y
+  let openedChest = null;
+  function openChestAt(x,y) {
+    const chest = chestsPlaced.find(c => c.x === x && c.y === y);
+    if(!chest) return;
+    openedChest = chest;
+    renderChestPopup();
+    chestPopup.style.display = 'block';
+    overlay.style.display = 'block';
+  }
+  // Render chest inventory popup
+  function renderChestPopup() {
+    chestGrid.innerHTML = '';
+    for(let i=0; i<3; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'inv-slot';
+      const item = openedChest.contents[i];
+      if(item) slot.textContent = item;
+      else slot.textContent = '';
+      slot.dataset.index = i;
+      slot.addEventListener('click', onChestSlotClick);
+      chestGrid.appendChild(slot);
+    }
+  }
+  // Chest slot click handler: move items between player and chest
+  function onChestSlotClick(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    if(!openedChest) return;
+    const chestItem = openedChest.contents[idx];
+    if(chestItem) {
+      // Move chest item to player inventory
+      player.inventory[chestItem] = (player.inventory[chestItem] || 0) + 1;
+      openedChest.contents.splice(idx,1);
+    } else {
+      // Add first available player item to chest
+      for(let item in player.inventory) {
+        if(player.inventory[item] > 0) {
+          openedChest.contents[idx] = item;
+          player.inventory[item]--;
+          if(player.inventory[item] <= 0) delete player.inventory[item];
+          break;
+        }
+      }
+    }
+    renderChestPopup();
+    updateUI();
+  }
+
+  // Player interacts with tile (tap)
+  function interactTile(x,y) {
+    if(paused) return;
+    if(distance(player.x, player.y, x, y) > 3) {
+      showMessage("Too far to interact!");
+      return;
+    }
+    const tile = world[y][x];
+
+    // If tree, chop
+    if(tile.type === 'tree') {
+      chopTreeAt(x,y);
+      return;
+    }
+
+    // Doors open/close by tap
+    if(tile.type === 'door') {
+      toggleDoorAt(x,y);
+      return;
+    }
+
+    // Chests open
+    if(tile.type === 'chest') {
+      openChestAt(x,y);
+      return;
+    }
+
+    // Beds skip night
+    if(tile.type === 'bed') {
+      if(isNight) {
+        showMessage("Skipping night...");
+        isNight = false;
+        dayNightTimer = 0;
+        clearMonsters();
+        renderWorld();
+      } else {
+        showMessage("It's already day");
+      }
+      return;
+    }
+
+    // Attack monster if close and tile occupied
+    const mon = monsters.find(m => m.x === x && m.y === y && m.health > 0);
+    if(mon) {
+      if(distance(player.x, player.y, x, y) <= ATTACK_RANGE) {
+        attackMonster(mon);
+      } else {
+        showMessage("Monster too far to attack");
+      }
+      return;
+    }
+  }
+
+  // Attack monster helper
+  function attackMonster(monster) {
+    if(monster.health <= 0) return;
+    const damage = player.holdingTool === 'axe' ? 5 : 2;
+    monster.health -= damage;
+    if(monster.health <= 0) {
+      showMessage("Monster defeated! +1 felt");
+      player.inventory.felt = (player.inventory.felt || 0) + 1;
+    } else {
+      showMessage(`Hit monster for ${damage} damage, HP left: ${monster.health}`);
+    }
+    updateUI();
+    renderWorld();
+  }
+
+  // Player death handler
+  function onPlayerDeath() {
+    showMessage("You died! Losing inventory and respawning...");
+    player.health = PLAYER_MAX_HEALTH;
+    player.inventory = {};
+    updateUI();
+    // Respawn at bed or random spot
+    if(bedsPlaced.length > 0) {
+      const bed = bedsPlaced[0];
+      player.x = bed.x;
+      player.y = bed.y;
+    } else {
+      player.x = Math.floor(Math.random()*WORLD_WIDTH);
+      player.y = Math.floor(Math.random()*WORLD_HEIGHT);
+    }
+    renderWorld();
+  }
+
+  // Game loop
+  function gameLoop(timestamp) {
+    if(!lastUpdate) lastUpdate = timestamp;
+    const delta = timestamp - lastUpdate;
+    if(!paused) {
+      dayNightTimer += delta;
+      if(isNight && dayNightTimer >= NIGHT_DURATION) {
+        isNight = false;
+        dayNightTimer = 0;
+        clearMonsters();
+        showMessage("Daytime! Monsters gone.");
+      }
+      if(!isNight && dayNightTimer >= DAY_DURATION) {
+        isNight = true;
+        dayNightTimer = 0;
+        spawnMonsters();
+        showMessage("Nighttime! Beware monsters!");
+      }
+
+      moveMonsters(delta);
+      monsterAttack(delta);
+    }
+    lastUpdate = timestamp;
+    renderWorld();
+    requestAnimationFrame(gameLoop);
+  }
+
+  // Keyboard controls
+  document.addEventListener('keydown', e => {
+    if(paused) return;
+    switch(e.key) {
+      case 'ArrowUp': movePlayer(0,-1); break;
+      case 'ArrowDown': movePlayer(0,1); break;
+      case 'ArrowLeft': movePlayer(-1,0); break;
+      case 'ArrowRight': movePlayer(1,0); break;
+      case ' ': interactTile(player.x, player.y); break;
+    }
+  });
+
+  // Mobile controls buttons
+  upBtn.onclick = () => movePlayer(0,-1);
+  downBtn.onclick = () => movePlayer(0,1);
+  leftBtn.onclick = () => movePlayer(-1,0);
+  rightBtn.onclick = () => movePlayer(1,0);
+
+  // Game clicks (interact on tile tap)
+  gameEl.addEventListener('click', e => {
+    if(paused) return;
+    const tileDiv = e.target.closest('.tile');
+    if(!tileDiv) return;
+    const x = parseInt(tileDiv.dataset.x);
+    const y = parseInt(tileDiv.dataset.y);
+    interactTile(x,y);
+  });
+
+  // Crafting popup open
+  craftBtn.onclick = () => {
+    craftPopup.style.display = 'block';
+    overlay.style.display = 'block';
+  };
+  closeCraftBtn.onclick = () => {
+    craftPopup.style.display = 'none';
+    overlay.style.display = 'none';
+  };
+
+  // Crafting logic
+  craftPopup.querySelectorAll('button[data-item]').forEach(btn => {
+    btn.onclick = () => {
+      const item = btn.dataset.item;
+      if(item === 'door') {
+        if((player.inventory.wood || 0) >= 2) {
+          player.inventory.wood -= 2;
+          player.inventory.door = (player.inventory.door || 0) + 1;
+          showMessage("Crafted Door");
+        } else showMessage("Not enough wood");
+      } else if(item === 'torch') {
+        if((player.inventory.wood || 0) >= 1) {
+          player.inventory.wood -= 1;
+          player.inventory.torch = (player.inventory.torch || 0) + 1;
+          showMessage("Crafted Torch");
+        } else showMessage("Not enough wood");
+      } else if(item === 'axe') {
+        if((player.inventory.wood || 0) >= 4) {
+          player.inventory.wood -= 4;
+          player.inventory.axe = (player.inventory.axe || 0) + 1;
+          showMessage("Crafted Axe");
+        } else showMessage("Not enough wood");
+      } else if(item === 'chest') {
+        if((player.inventory.wood || 0) >= 3) {
+          player.inventory.wood -= 3;
+          player.inventory.chest = (player.inventory.chest || 0) + 1;
+          showMessage("Crafted Chest");
+        } else showMessage("Not enough wood");
+      } else if(item === 'bed') {
+        if((player.inventory.wood || 0) >= 3 && (player.inventory.felt || 0) >= 2) {
+          player.inventory.wood -= 3;
+          player.inventory.felt -= 2;
+          player.inventory.bed = (player.inventory.bed || 0) + 1;
+          showMessage("Crafted Bed");
+        } else showMessage("Need 3 wood and 2 felt");
+      }
+      updateUI();
+    };
+  });
+
+  // Place item selector open
+  placeBtn.onclick = () => {
+    placeSelector.style.display = 'block';
+    overlay.style.display = 'block';
+  };
+  closePlaceSelectorBtn.onclick = () => {
+    placeSelector.style.display = 'none';
+    overlay.style.display = 'none';
+  };
+  placeSelector.querySelectorAll('button[data-place]').forEach(btn => {
+    btn.onclick = () => {
+      const placeItem = btn.dataset.place;
+      if((player.inventory[placeItem] || 0) > 0) {
+        player.holdingPlaceItem = placeItem;
+        showMessage(`Selected ${placeItem} to place. Tap on grass tile.`);
+        placeSelector.style.display = 'none';
+        overlay.style.display = 'none';
+      } else {
+        showMessage(`No ${placeItem} in inventory`);
+      }
+    };
+  });
+
+  // Game pause and resume
+  pauseBtn.onclick = () => {
+    paused = true;
+    pauseMenu.style.display = 'flex';
+    overlay.style.display = 'block';
+  };
+  resumeBtn.onclick = () => {
+    paused = false;
+    pauseMenu.style.display = 'none';
+    overlay.style.display = 'none';
+  };
+  pauseHowToPlayBtn.onclick = () => {
+    paused = true;
+    pauseMenu.style.display = 'none';
+    howToPlayScreen.style.display = 'flex';
+  };
+  pauseHomeBtn.onclick = () => {
+    paused = false;
+    pauseMenu.style.display = 'none';
+    overlay.style.display = 'none';
+    uiEl.style.display = 'none';
+    gameEl.style.display = 'none';
+    controls.style.display = 'none';
+    homeScreen.style.display = 'flex';
+  };
+
+  // Back to home from How To Play
+  backToHomeBtn.onclick = () => {
+    howToPlayScreen.style.display = 'none';
+    homeScreen.style.display = 'flex';
+  };
+  howToPlayBtn.onclick = () => {
+    homeScreen.style.display = 'none';
+    howToPlayScreen.style.display = 'flex';
+  };
+
+  // Close chest popup
+  closeChestBtn.onclick = () => {
+    chestPopup.style.display = 'none';
+    overlay.style.display = 'none';
+    openedChest = null;
+  };
+
+  // Game start
+  startGameBtn.onclick = () => {
+    homeScreen.style.display = 'none';
+    uiEl.style.display = 'flex';
+    gameEl.style.display = 'grid';
+    controls.style.display = 'flex';
+    paused = false;
+    initWorld();
+    player.x = 7; player.y = 5;
+    player.health = PLAYER_MAX_HEALTH;
+    player.inventory = {wood:5, felt:0, door:0, torch:0, axe:1, chest:0, bed:0};
+    player.holdingPlaceItem = null;
+    player.holdingTool = 'fist';
+    isNight = false;
+    dayNightTimer = 0;
+    monsters = [];
+    renderWorld();
+    updateUI();
+    lastUpdate = null;
+    requestAnimationFrame(gameLoop);
+  };
+
+  // Clicking on tiles to place or attack with axe
+  gameEl.addEventListener('click', e => {
+    if(paused) return;
+    const tileDiv = e.target.closest('.tile');
+    if(!tileDiv) return;
+    const x = Number(tileDiv.dataset.x);
+    const y = Number(tileDiv.dataset.y);
+
+    if(player.holdingPlaceItem) {
+      placeBlock(x,y);
+      return;
+    }
+
+    const tile = world[y][x];
+    const mon = monsters.find(m => m.x === x && m.y === y && m.health > 0);
+
+    // Axe used to break blocks (doors, torches, wood, chests, beds)
+    if(player.holdingTool === 'axe') {
+      if(distance(player.x, player.y, x, y) <= ATTACK_RANGE) {
+        if(tile.type === 'door') {
+          toggleDoorAt(x,y);
+          showMessage("Door toggled");
+        } else if(tile.type === 'torch') {
+          // Remove torch
+          world[y][x] = {type:'grass'};
+          torchesPlaced = torchesPlaced.filter(t => !(t.x === x && t.y === y));
+          player.inventory.torch = (player.inventory.torch || 0) + 1;
+          showMessage("Torch removed, +1 torch");
+        } else if(tile.type === 'wood') {
+          world[y][x] = {type:'grass'};
+          player.inventory.wood = (player.inventory.wood || 0) + 1;
+          showMessage("Wood block removed, +1 wood");
+        } else if(tile.type === 'chest') {
+          // Remove chest
+          chestsPlaced = chestsPlaced.filter(c => !(c.x === x && c.y === y));
+          world[y][x] = {type:'grass'};
+          player.inventory.chest = (player.inventory.chest || 0) + 1;
+          showMessage("Chest removed, +1 chest");
+        } else if(tile.type === 'bed') {
+          bedsPlaced = bedsPlaced.filter(b => !(b.x === x && b.y === y));
+          world[y][x] = {type:'grass'};
+          player.inventory.bed = (player.inventory.bed || 0) + 1;
+          showMessage("Bed removed, +1 bed");
+        } else if(mon) {
+          attackMonster(mon);
+        } else {
+          showMessage("Nothing to break here");
+        }
+        renderWorld();
+        updateUI();
+      } else {
+        showMessage("Too far to break");
+      }
+    } else {
+      // Fist: attack monsters if close
+      if(mon && distance(player.x, player.y, x, y) <= ATTACK_RANGE) {
+        attackMonster(mon);
+      } else {
+        interactTile(x,y);
+      }
+    }
+  });
+
+  // Clicking inventory slots to select axe tool or fist
+  inventoryEl.addEventListener('click', e => {
+    const target = e.target;
+    if(!target.classList.contains('inv-slot')) return;
+    const item = target.textContent.charAt(0).toLowerCase();
+    if(item === 'a' && player.inventory.axe > 0) {
+      player.holdingTool = 'axe';
+      showMessage("Holding axe");
+    } else {
+      player.holdingTool = 'fist';
+      showMessage("Holding fist");
+    }
+  });
+
+  // Start the game UI hidden
+  uiEl.style.display = 'none';
+  gameEl.style.display = 'none';
+  controls.style.display = 'none';
+
+  // Overlay hides popups on click
+  overlay.addEventListener('click', () => {
+    craftPopup.style.display = 'none';
+    placeSelector.style.display = 'none';
+    chestPopup.style.display = 'none';
+    overlay.style.display = 'none';
+  });
+
+})();
+</script>
+
+</body>
+</html>
